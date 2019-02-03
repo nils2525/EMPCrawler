@@ -62,6 +62,24 @@ namespace EMPCrawler.Model
             }
         }
 
-        public virtual List<ProductHistory> ProductHistories { get; set; }
+        public virtual List<ProductHistory> ProductHistories { get; set; } = new List<ProductHistory>();
+
+        public bool HistorieChanged(Product product)
+        {
+            var lastHistoryEntry = ProductHistories.Last();
+            if(lastHistoryEntry == null ||
+                lastHistoryEntry.Availability != product.Availability ||
+                lastHistoryEntry.DiscountPercentage != product.DiscountPercentage ||
+                lastHistoryEntry.NormalPrice != product.NormalPrice ||
+                lastHistoryEntry.SalePrice != product.SalePrice ||
+                lastHistoryEntry.SaleType != lastHistoryEntry.SaleType)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
     }
 }

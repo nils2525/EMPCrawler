@@ -16,6 +16,7 @@ namespace EMPCrawler
 
             var loginResult = await client.Login("wishlist");
             var wishList = await client.GetWishListProducts(loginResult);
+            DBHelper.UpdateProducts(wishList);
         }
     }
 }
