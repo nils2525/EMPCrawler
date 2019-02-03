@@ -5,18 +5,16 @@ using System.Text;
 
 namespace EMPCrawler.Model
 {
-    public class Product
+    public class ProductHistory
     {
         public int ProductCode { get; set; }
-        public string Name { get; set; }
-        public string Brand { get; set; }
+
         public decimal NormalPrice { get; set; }
+
         public SaleType? SaleType { get; set; }
+
         public decimal? SalePrice { get; set; }
         public int? DiscountPercentage { get; set; }
-        public string Link { get; set; }
-        public string Type { get; set; }
-        public string ImageUrl { get; set; }
 
         private string _availabilityString;
         public string AvailabilityString
@@ -62,6 +60,8 @@ namespace EMPCrawler.Model
             }
         }
 
-        public virtual List<ProductHistory> ProductHistories { get; set; }
+        public DateTime Timestamp { get; set; }
+
+        public virtual Product Product { get; set; }
     }
 }

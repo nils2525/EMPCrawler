@@ -137,7 +137,7 @@ namespace EMPCrawler
                 //Generate Product instance
                 var product = GetProduct(itemRow);
 
-                if(product != null)
+                if (product != null)
                 {
                     products.Add(product);
                 }
@@ -175,13 +175,25 @@ namespace EMPCrawler
             var normalPriceString = priceNode.Descendants("span").Where(c => c.Attributes.Count == 0).FirstOrDefault().InnerText;
             var normalPrice = Decimal.Parse(Regex.Match(normalPriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
 
-            var salePriceString = priceNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "price-sale price-sales")?.FirstOrDefault()?.InnerText;
 
+
+            SaleType? saleType = null;
             decimal? salePrice = null;
+
+            var salePriceString = priceNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "price-sale price-sales")?.FirstOrDefault()?.InnerText;
             if (salePriceString != null)
             {
+                saleType = SaleType.Normal;
                 salePrice = Decimal.Parse(Regex.Match(salePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
             }
+
+            var bscSalePriceString = priceNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "price-bsc price-sales")?.FirstOrDefault()?.InnerText;
+            if (bscSalePriceString != null)
+            {
+                saleType = SaleType.BSC;
+                salePrice = Decimal.Parse(Regex.Match(salePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
+            }
+
 
             var discountString = priceNode.Descendants("input").Where(c => c.Attributes["class"]?.Value == "disountPercent")?.FirstOrDefault()?.Attributes["value"]?.Value?.Replace("%", "");
 
@@ -202,7 +214,8 @@ namespace EMPCrawler
                 NormalPrice = normalPrice,
                 SalePrice = salePrice,
                 DiscountPercentage = discount,
-                ImageUrl = imageUrl
+                ImageUrl = imageUrl,
+                SaleType = saleType
             };
         }
     }
