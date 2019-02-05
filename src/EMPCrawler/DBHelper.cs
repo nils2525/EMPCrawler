@@ -14,7 +14,7 @@ namespace EMPCrawler
         {
             using (var context = new SQLiteContext())
             {                
-                context.Database.EnsureCreated();
+                //context.Database.EnsureCreated();
 
                 foreach (var product in products)
                 {

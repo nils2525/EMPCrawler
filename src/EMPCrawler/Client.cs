@@ -37,6 +37,16 @@ namespace EMPCrawler
             };
             _client = new HttpClient(_clientHandler);
         }
+        public Client()
+        {
+            _cookies = new CookieContainer();
+            _clientHandler = new HttpClientHandler
+            {
+                UseCookies = true,
+                CookieContainer = _cookies
+            };
+            _client = new HttpClient(_clientHandler);
+        }
 
         /// <summary>
         /// Login user
@@ -46,6 +56,11 @@ namespace EMPCrawler
         /// <returns>HtmlDocument of scope page</returns>
         public async Task<HtmlDocument> Login(string scope = null)
         {
+            if(String.IsNullOrWhiteSpace(_username) || String.IsNullOrWhiteSpace(_password))
+            {
+                return null;
+            }
+
             if (String.IsNullOrWhiteSpace(scope))
             {
                 scope = "";
@@ -105,7 +120,7 @@ namespace EMPCrawler
         /// </summary>
         /// <param name="wishList"></param>
         /// <returns></returns>
-        public async Task<List<Product>> GetWishListProducts(HtmlDocument wishList = null)
+        public async Task<List<Product>> GetWishListProductsAsync(HtmlDocument wishList = null)
         {
             if (!IsLoggedIn)
             {
@@ -135,7 +150,7 @@ namespace EMPCrawler
             foreach (var itemRow in itemRows)
             {
                 //Generate Product instance
-                var product = GetProduct(itemRow);
+                var product = GetProductFromWishList(itemRow);
 
                 if (product != null)
                 {
@@ -151,7 +166,7 @@ namespace EMPCrawler
         /// </summary>
         /// <param name="itemRow">"item-row js-product-items" instance</param>
         /// <returns></returns>
-        private static Product GetProduct(HtmlNode itemRow)
+        private Product GetProductFromWishList(HtmlNode itemRow)
         {
             var imageUrl = itemRow.Descendants("img").FirstOrDefault().Attributes["src"]?.Value;
 
@@ -168,32 +183,8 @@ namespace EMPCrawler
 
 
             var availabilityString = itemRow.Descendants("ul").Where(c => c.Attributes["class"]?.Value == "product-availability-list").FirstOrDefault()?.Descendants("li")?.Where(c => c.Attributes.Contains("class"))?.FirstOrDefault()?.Attributes["class"]?.Value;
-
-
-            var priceNode = itemRow.Descendants("div").Where(c => c.Attributes["class"]?.Value == "price").FirstOrDefault();
-
-            var normalPriceString = priceNode.Descendants("span").Where(c => c.Attributes.Count == 0).FirstOrDefault().InnerText;
-            var normalPrice = Decimal.Parse(Regex.Match(normalPriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
-
-
-
-            SaleType? saleType = null;
-            decimal? salePrice = null;
-
-            var salePriceString = priceNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "price-sale price-sales")?.FirstOrDefault()?.InnerText;
-            if (salePriceString != null)
-            {
-                saleType = SaleType.Normal;
-                salePrice = Decimal.Parse(Regex.Match(salePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
-            }
-
-            var bscSalePriceString = priceNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "price-bsc price-sales")?.FirstOrDefault()?.InnerText;
-            if (bscSalePriceString != null)
-            {
-                saleType = SaleType.BSC;
-                salePrice = Decimal.Parse(Regex.Match(salePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
-            }
-
+            
+            var priceNode = GetPrices("price", itemRow, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice);
 
             var discountString = priceNode.Descendants("input").Where(c => c.Attributes["class"]?.Value == "disountPercent")?.FirstOrDefault()?.Attributes["value"]?.Value?.Replace("%", "");
 
@@ -217,6 +208,156 @@ namespace EMPCrawler
                 ImageUrl = imageUrl,
                 SaleType = saleType
             };
+        }
+
+        private static HtmlNode GetPrices(string priceNodeName, HtmlNode itemRow, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice)
+        {
+            var priceNode = itemRow.Descendants("div").Where(c => c.Attributes["class"]?.Value == priceNodeName).FirstOrDefault();
+
+            var normalPriceString = priceNode.Descendants("span").Where(c => c.Attributes.Count == 0).FirstOrDefault().InnerText;
+            normalPrice = Decimal.Parse(Regex.Match(normalPriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
+            saleType = null;
+            salePrice = null;
+            var salePriceString = priceNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "price-sale price-sales")?.FirstOrDefault()?.InnerText;
+            if (salePriceString != null)
+            {
+                saleType = SaleType.Normal;
+                salePrice = Decimal.Parse(Regex.Match(salePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
+            }
+
+            var bscSalePriceString = priceNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "price-bsc price-sales")?.FirstOrDefault()?.InnerText;
+            if (bscSalePriceString != null)
+            {
+                saleType = SaleType.BSC;
+                salePrice = Decimal.Parse(Regex.Match(salePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
+            }
+
+            return priceNode;
+        }
+
+        public async Task<List<Product>> GetProductsAsync(string productsUrl, int? pages = null)
+        {
+            if (String.IsNullOrWhiteSpace(productsUrl))
+            {
+                return null;
+            }
+
+            var firstUrl = UpdatePage(productsUrl);
+            var firstPage = await _client.GetAsync(firstUrl);
+            if (firstPage.IsSuccessStatusCode)
+            {
+                var firstPageString = await firstPage.Content.ReadAsStringAsync();
+                var firstPageDocument = new HtmlDocument();
+                firstPageDocument.LoadHtml(firstPageString);
+
+                var maxPages = GetMaxPages(firstPageDocument);
+                if (pages == null || pages > maxPages)
+                {
+                    pages = maxPages;
+                }
+
+                var products = new List<Product>();
+
+                var firstPageProducts = GetProductsFromPage(firstPageDocument);
+                if(firstPageProducts?.Count > 0)
+                {
+                    products.AddRange(firstPageProducts);
+                }
+
+                for (int i = 1; i <= pages; i++)
+                {
+                    var currentPageUrl = UpdatePage(productsUrl, i);
+                    var currentPageRaw = await _client.GetAsync(currentPageUrl);
+                    var currentPageString = await currentPageRaw.Content.ReadAsStringAsync();
+
+                    var currentPageDocument = new HtmlDocument();
+                    currentPageDocument.Load(currentPageString);
+
+                    var currentProducts = GetProductsFromPage(currentPageDocument);
+                    if(currentProducts?.Count > 0)
+                    {
+                        products.AddRange(currentProducts);
+                    }
+                }
+                return products;
+            }
+            return null;
+        }
+
+        private string UpdatePage(string url, int page = 0)
+        {
+            if(page < 0)
+            {
+                page = 0;
+            }
+
+            var uri = new Uri(url);
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+            //Products per page
+            query["sz"] = "60";
+            //Start at n products
+            query["start"] = (60*page).ToString();
+
+            return uri.Scheme + "://" + uri.Host + uri.AbsolutePath + "?" + query.ToString();
+        }
+
+        private int GetMaxPages(HtmlDocument productListPage)
+        {
+            if(productListPage == null)
+            {
+                return -1;
+            }
+
+            var listInfo = productListPage.DocumentNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "search-result-articles-mobile").FirstOrDefault();
+            var pageInfo = listInfo.Descendants("span").Where(c => c.Attributes["class"]?.Value == "bold").ToList();
+
+            var maxPageString = pageInfo?.Skip(1)?.FirstOrDefault()?.InnerText;
+            if(Int32.TryParse(maxPageString, out int maxPage))
+            {
+                return maxPage;
+            }
+            else
+            {
+                return -1;
+            }
+        }
+
+        private List<Product> GetProductsFromPage(HtmlDocument page)
+        {
+            var products = new List<Product>();
+            var rawProductsInPage = page.DocumentNode.Descendants("div").Where(c => c.Attributes["class"]?.Value == "grid-tile").ToList();
+
+            foreach(var rawProduct in rawProductsInPage)
+            {
+                var product = GetProduct(rawProduct);
+                if(product != null)
+                {
+                    products.Add(product);
+                }
+            }
+            return products;
+        }
+        private Product GetProduct(HtmlNode productNode)
+        {
+            if(productNode == null)
+            {
+                return null;
+            }
+
+            var productTitleNode = productNode.Descendants("div").Where(c => c.Attributes["class"]?.Value == "product-tile").FirstOrDefault();
+
+            var productCodeString = productTitleNode.Attributes["data-itemid"]?.Value;
+            var productCode = Int32.Parse(productCodeString);
+
+            var linkNode = productTitleNode.Descendants("a").Where(c => c.Attributes["class"]?.Value == "product-link thumb-link").FirstOrDefault();
+            var link = linkNode.Attributes["href"]?.Value;
+
+            var imageLink = productTitleNode.Descendants("img").Where(c => c.Attributes.Contains("alt")).FirstOrDefault()?.Attributes["src"]?.Value;
+
+            var priceNode = GetPrices("product-pricing", productNode, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice);
+
+            return null;
         }
     }
 }
