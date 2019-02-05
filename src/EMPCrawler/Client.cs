@@ -9,35 +9,75 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace EMPCrawler
 {
     public class Client
     {
+        /// <summary>
+        /// EMP Username
+        /// </summary>
         private readonly string _username;
+        /// <summary>
+        /// EMP Password
+        /// </summary>
         private readonly string _password;
 
+        /// <summary>
+        /// Current cookies, send with every request
+        /// </summary>
         private CookieContainer _cookies;
+
+        /// <summary>
+        /// Current HTTPClient
+        /// </summary>
         private HttpClient _client;
+        /// <summary>
+        /// HTTPClient Handler
+        /// </summary>
         private HttpClientHandler _clientHandler;
 
+        /// <summary>
+        /// True = User is loggedd in
+        /// </summary>
         public bool IsLoggedIn { get; private set; } = false;
 
+        /// <summary>
+        /// Min delay in seconds for every request
+        /// </summary>
+        public int MinDelaySeconds;
+        /// <summary>
+        /// Max delay in seconds for every request
+        /// </summary>
+        public int MaxDelaySeconds;
+
+        /// <summary>
+        /// Client with login credentials
+        /// </summary>
+        /// <param name="username"></param>
+        /// <param name="password"></param>
         public Client(string username, string password)
         {
             _username = username;
             _password = password;
 
-            _cookies = new CookieContainer();
-            _clientHandler = new HttpClientHandler
-            {
-                UseCookies = true,
-                CookieContainer = _cookies
-            };
-            _client = new HttpClient(_clientHandler);
+            InitInstance();
         }
+
+        /// <summary>
+        /// Client without login credentials
+        /// </summary>
         public Client()
+        {
+            InitInstance();
+        }
+
+        /// <summary>
+        /// Called from ctor
+        /// </summary>
+        private void InitInstance()
         {
             _cookies = new CookieContainer();
             _clientHandler = new HttpClientHandler
@@ -46,6 +86,8 @@ namespace EMPCrawler
                 CookieContainer = _cookies
             };
             _client = new HttpClient(_clientHandler);
+
+            MinDelaySeconds = MaxDelaySeconds = 0;
         }
 
         /// <summary>
@@ -56,7 +98,7 @@ namespace EMPCrawler
         /// <returns>HtmlDocument of scope page</returns>
         public async Task<HtmlDocument> Login(string scope = null)
         {
-            if(String.IsNullOrWhiteSpace(_username) || String.IsNullOrWhiteSpace(_password))
+            if (String.IsNullOrWhiteSpace(_username) || String.IsNullOrWhiteSpace(_password))
             {
                 return null;
             }
@@ -122,6 +164,7 @@ namespace EMPCrawler
         /// <returns></returns>
         public async Task<List<Product>> GetWishListProductsAsync(HtmlDocument wishList = null)
         {
+            //Only possible with logged in user
             if (!IsLoggedIn)
             {
                 return null;
@@ -130,6 +173,7 @@ namespace EMPCrawler
             //Get Wishlist, if parameter is null
             if (wishList == null)
             {
+                //Get products from wishlist
                 var wishListResponse = await _client.GetAsync("https://www.emp.de/wishlist");
                 if (wishListResponse.IsSuccessStatusCode)
                 {
@@ -142,11 +186,10 @@ namespace EMPCrawler
                 }
             }
 
+            //Every item row
             var itemRows = wishList.DocumentNode.DescendantsAndSelf("tr").Where(c => c.Attributes.Contains("class") && c.Attributes["class"].Value.Contains("item-row js-product-items")).ToList();
-
-
+            
             var products = new List<Product>();
-
             foreach (var itemRow in itemRows)
             {
                 //Generate Product instance
@@ -168,8 +211,7 @@ namespace EMPCrawler
         /// <returns></returns>
         private Product GetProductFromWishList(HtmlNode itemRow)
         {
-            var imageUrl = itemRow.Descendants("img").FirstOrDefault().Attributes["src"]?.Value;
-
+            var imageUrl = GetImageLink(itemRow);
 
             var nameNode = itemRow.DescendantsAndSelf("div").Where(c => c.Attributes["class"]?.Value == "product-list-item").FirstOrDefault();
 
@@ -183,7 +225,7 @@ namespace EMPCrawler
 
 
             var availabilityString = itemRow.Descendants("ul").Where(c => c.Attributes["class"]?.Value == "product-availability-list").FirstOrDefault()?.Descendants("li")?.Where(c => c.Attributes.Contains("class"))?.FirstOrDefault()?.Attributes["class"]?.Value;
-            
+
             var priceNode = GetPrices("price", itemRow, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice);
 
             var discountString = priceNode.Descendants("input").Where(c => c.Attributes["class"]?.Value == "disountPercent")?.FirstOrDefault()?.Attributes["value"]?.Value?.Replace("%", "");
@@ -210,6 +252,15 @@ namespace EMPCrawler
             };
         }
 
+        /// <summary>
+        /// Get Price info from ItemRow
+        /// </summary>
+        /// <param name="priceNodeName"></param>
+        /// <param name="itemRow"></param>
+        /// <param name="normalPrice"></param>
+        /// <param name="saleType"></param>
+        /// <param name="salePrice"></param>
+        /// <returns></returns>
         private static HtmlNode GetPrices(string priceNodeName, HtmlNode itemRow, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice)
         {
             var priceNode = itemRow.Descendants("div").Where(c => c.Attributes["class"]?.Value == priceNodeName).FirstOrDefault();
@@ -235,6 +286,12 @@ namespace EMPCrawler
             return priceNode;
         }
 
+        /// <summary>
+        /// Get products from product list url
+        /// </summary>
+        /// <param name="productsUrl"></param>
+        /// <param name="pages">pages to get items (null = max available)</param>
+        /// <returns></returns>
         public async Task<List<Product>> GetProductsAsync(string productsUrl, int? pages = null)
         {
             if (String.IsNullOrWhiteSpace(productsUrl))
@@ -250,31 +307,43 @@ namespace EMPCrawler
                 var firstPageDocument = new HtmlDocument();
                 firstPageDocument.LoadHtml(firstPageString);
 
+                //Max Pages available
                 var maxPages = GetMaxPages(firstPageDocument);
+
                 if (pages == null || pages > maxPages)
                 {
+                    //Set pages to maxPages
                     pages = maxPages;
                 }
 
                 var products = new List<Product>();
 
+                //Get products from first pageDocument
                 var firstPageProducts = GetProductsFromPage(firstPageDocument);
-                if(firstPageProducts?.Count > 0)
+                if (firstPageProducts?.Count > 0)
                 {
                     products.AddRange(firstPageProducts);
                 }
+                
 
-                for (int i = 1; i <= pages; i++)
+                for (int i = 1; i < pages; i++)
                 {
+                    //Delay next request...
+                    WaitForDelay();
+
+                    //Url for next page
                     var currentPageUrl = UpdatePage(productsUrl, i);
+
+                    //Get page
                     var currentPageRaw = await _client.GetAsync(currentPageUrl);
                     var currentPageString = await currentPageRaw.Content.ReadAsStringAsync();
 
                     var currentPageDocument = new HtmlDocument();
-                    currentPageDocument.Load(currentPageString);
+                    currentPageDocument.LoadHtml(currentPageString);
 
+                    //Get products from html document
                     var currentProducts = GetProductsFromPage(currentPageDocument);
-                    if(currentProducts?.Count > 0)
+                    if (currentProducts?.Count > 0)
                     {
                         products.AddRange(currentProducts);
                     }
@@ -284,9 +353,15 @@ namespace EMPCrawler
             return null;
         }
 
+        /// <summary>
+        /// Update page url for next page
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="page"></param>
+        /// <returns></returns>
         private string UpdatePage(string url, int page = 0)
         {
-            if(page < 0)
+            if (page < 0)
             {
                 page = 0;
             }
@@ -296,15 +371,20 @@ namespace EMPCrawler
 
             //Products per page
             query["sz"] = "60";
-            //Start at n products
-            query["start"] = (60*page).ToString();
+            //Start at n products (every page has 60 items, so we calculate 60 * pages)
+            query["start"] = (60 * page).ToString();
 
             return uri.Scheme + "://" + uri.Host + uri.AbsolutePath + "?" + query.ToString();
         }
 
+        /// <summary>
+        /// Get count of max pages
+        /// </summary>
+        /// <param name="productListPage"></param>
+        /// <returns></returns>
         private int GetMaxPages(HtmlDocument productListPage)
         {
-            if(productListPage == null)
+            if (productListPage == null)
             {
                 return -1;
             }
@@ -313,7 +393,7 @@ namespace EMPCrawler
             var pageInfo = listInfo.Descendants("span").Where(c => c.Attributes["class"]?.Value == "bold").ToList();
 
             var maxPageString = pageInfo?.Skip(1)?.FirstOrDefault()?.InnerText;
-            if(Int32.TryParse(maxPageString, out int maxPage))
+            if (Int32.TryParse(maxPageString, out int maxPage))
             {
                 return maxPage;
             }
@@ -323,24 +403,35 @@ namespace EMPCrawler
             }
         }
 
+        /// <summary>
+        /// Get products from product-list page
+        /// </summary>
+        /// <param name="page"></param>
+        /// <returns></returns>
         private List<Product> GetProductsFromPage(HtmlDocument page)
         {
             var products = new List<Product>();
             var rawProductsInPage = page.DocumentNode.Descendants("div").Where(c => c.Attributes["class"]?.Value == "grid-tile").ToList();
 
-            foreach(var rawProduct in rawProductsInPage)
+            foreach (var rawProduct in rawProductsInPage)
             {
                 var product = GetProduct(rawProduct);
-                if(product != null)
+                if (product != null)
                 {
                     products.Add(product);
                 }
             }
             return products;
         }
+
+        /// <summary>
+        /// Get product from product-list page entry
+        /// </summary>
+        /// <param name="productNode"></param>
+        /// <returns></returns>
         private Product GetProduct(HtmlNode productNode)
         {
-            if(productNode == null)
+            if (productNode == null)
             {
                 return null;
             }
@@ -353,11 +444,75 @@ namespace EMPCrawler
             var linkNode = productTitleNode.Descendants("a").Where(c => c.Attributes["class"]?.Value == "product-link thumb-link").FirstOrDefault();
             var link = linkNode.Attributes["href"]?.Value;
 
-            var imageLink = productTitleNode.Descendants("img").Where(c => c.Attributes.Contains("alt")).FirstOrDefault()?.Attributes["src"]?.Value;
+            string imageLink = GetImageLink(productTitleNode);
 
             var priceNode = GetPrices("product-pricing", productNode, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice);
 
-            return null;
+            var discountNode = priceNode.Descendants("div").Where(c => c.Attributes["class"]?.Value == "discount-price-badge").FirstOrDefault();
+            var discountString = discountNode?.Descendants("span")?.FirstOrDefault()?.InnerText?.Replace("%", "");
+
+            int? discount = null;
+            if (discountString != null)
+            {
+                discount = Int32.Parse(discountString);
+            }
+
+            var nameNode = productNode.Descendants("div").Where(c => c.Attributes["class"]?.Value == "product-name").FirstOrDefault();
+            var name = nameNode.Descendants("span").Where(c => c.Attributes["class"]?.Value == "bold").FirstOrDefault()?.InnerText.Replace("\n", "");
+            var brand = nameNode.Descendants("span").Where(c => c.Attributes.Count == 0).FirstOrDefault().InnerText.Replace("\n", "");
+            var type = nameNode.Descendants("span").Where(c => c.Attributes.Count == 0).Skip(1).FirstOrDefault().InnerText.Replace("\n", "");
+
+            var product = new Product()
+            {
+                Availability = ProductAvailability.InStock,
+                Brand = brand,
+                DiscountPercentage = discount,
+                ImageUrl = imageLink,
+                Link = link,
+                Name = name,
+                NormalPrice = normalPrice,
+                ProductCode = productCode,
+                SalePrice = salePrice,
+                SaleType = saleType,
+                Type = type
+            };
+
+            return product;
+        }
+
+        /// <summary>
+        /// Get image link for item
+        /// </summary>
+        /// <param name="productTitleNode"></param>
+        /// <returns></returns>
+        private static string GetImageLink(HtmlNode productTitleNode)
+        {
+            var imageAttributes = productTitleNode.Descendants("img").Where(c => c.Attributes.Contains("alt")).FirstOrDefault()?.Attributes?.ToList();
+
+            string imageLink = null;
+            if (imageAttributes.Any(c => c.Name == "data-src"))
+            {
+                imageLink = imageAttributes.Where(c => c.Name == "data-src").FirstOrDefault()?.Value;
+            }
+            else if (imageAttributes.Any(c => c.Name == "src"))
+            {
+                imageLink = imageAttributes.Where(c => c.Name == "src").FirstOrDefault()?.Value;
+            }
+
+            return imageLink;
+        }
+
+        /// <summary>
+        /// Delay for next request
+        /// </summary>
+        private void WaitForDelay()
+        {
+            if (MinDelaySeconds >= 0 && MaxDelaySeconds > 0)
+            {
+                var randomizer = new Random();
+                var randomDelay = randomizer.Next(MinDelaySeconds * 1000, MaxDelaySeconds * 1000);
+                Thread.Sleep(randomDelay);
+            }
         }
     }
 }
