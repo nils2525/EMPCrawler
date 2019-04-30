@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace EMPCrawler
 {
@@ -18,12 +20,16 @@ namespace EMPCrawler
 
                 foreach (var product in products)
                 {
-                    var dbProduct = context.Products.Include(nameof(Product.ProductHistories)).Where(p => p.ProductCode == product.ProductCode).FirstOrDefault();
+                    var dbProduct = context.Products.Include(nameof(Product.ProductHistories)).Where(p => p.ProductCode == product.ProductCode).FirstOrDefault() ?? 
+                        context.Products.Local.Where(p => p.ProductCode == product.ProductCode).FirstOrDefault();
 
                     //add product to db, if not exist
                     if (dbProduct == null)
                     {
                         Console.WriteLine("Found new product in wishlist");
+                        var telegramClient = new HttpClient();
+                        var message = HttpUtility.UrlEncode("Found new product in wishlist(" + product.Link + ")");
+                        telegramClient.PostAsync("https://api.telegram.org/bot324060916:AAEV0ETgaGgSt3IMZ9gpy8X5wWILQClnxHU/sendMessage?chat_id=339666943&text=" + message, null).Wait();
 
                         product.ProductHistories.Add(new ProductHistory()
                         {

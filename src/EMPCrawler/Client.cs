@@ -3,10 +3,13 @@ using HtmlAgilityPack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -16,6 +19,8 @@ namespace EMPCrawler
 {
     public class Client
     {
+        private const string _sessionFileName = "emp.session";
+
         /// <summary>
         /// EMP Username
         /// </summary>
@@ -82,6 +87,7 @@ namespace EMPCrawler
             _cookies = new CookieContainer();
             _clientHandler = new HttpClientHandler
             {
+                AllowAutoRedirect = true,
                 UseCookies = true,
                 CookieContainer = _cookies
             };
@@ -157,6 +163,101 @@ namespace EMPCrawler
             }
         }
 
+        public bool RestoreLoginCookies()
+        {
+            if (File.Exists(_sessionFileName))
+            {
+                try
+                {
+                    var cookieJson = File.ReadAllText(_sessionFileName);
+                    var cookieList = JsonConvert.DeserializeObject<List<Cookie>>(cookieJson);
+
+                    _clientHandler.CookieContainer = _cookies = new CookieContainer();
+                    foreach (var cookie in cookieList)
+                    {
+                        _cookies.Add(new Cookie(cookie.Name, cookie.Value, cookie.Path, cookie.Domain));
+                    }
+
+                    return IsLoggedIn = true;
+                }
+                catch (Exception e)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+
+        public bool StoreLoginCookies()
+        {
+            try
+            {
+                var cookies = _clientHandler.CookieContainer.GetCookies(new Uri("https://www.emp.de/"));
+                var container = JsonConvert.SerializeObject(GetAllCookies(_clientHandler.CookieContainer));
+                File.WriteAllText(_sessionFileName, container);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+        }
+
+        public async Task<bool> CurrentCookiesAreValid()
+        {
+            var response = await _client.GetAsync("https://www.emp.de/");
+            if (response.IsSuccessStatusCode)
+            {
+                //Get raw string
+                var wishListRaw = await response.Content.ReadAsStringAsync();
+
+                //Init document
+                var document = new HtmlDocument();
+                document.LoadHtml(wishListRaw);
+
+                return document.DocumentNode.Descendants("a").Where(c => (c.Attributes["class"]?.Value?.Contains("user-account") ?? false) && !(c.Attributes["title"]?.Value?.Contains("Login") ?? false)).Count() > 0;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+
+        private static CookieCollection GetAllCookies(CookieContainer cookieJar)
+        {
+            CookieCollection cookieCollection = new CookieCollection();
+
+            Hashtable table = (Hashtable)cookieJar.GetType().InvokeMember("m_domainTable", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance, null, cookieJar, new object[] { });
+
+            foreach (var tableKey in table.Keys)
+            {
+                String str_tableKey = (string)tableKey;
+
+                if (str_tableKey[0] == '.')
+                {
+                    str_tableKey = str_tableKey.Substring(1);
+                }
+
+                SortedList list = (SortedList)table[tableKey].GetType().InvokeMember("m_list", BindingFlags.NonPublic | BindingFlags.GetField | BindingFlags.Instance, null, table[tableKey], new object[] { });
+
+                foreach (var listKey in list.Keys)
+                {
+                    String url = "https://" + str_tableKey + (string)listKey;
+                    cookieCollection.Add(cookieJar.GetCookies(new Uri(url)));
+                }
+            }
+
+            return cookieCollection;
+        }
+
+
+
         /// <summary>
         /// Get all items from wishlist
         /// </summary>
@@ -192,7 +293,7 @@ namespace EMPCrawler
 
             //Every item row
             var itemRows = wishList.DocumentNode.DescendantsAndSelf("tr").Where(c => c.Attributes.Contains("class") && c.Attributes["class"].Value.Contains("item-row js-product-items")).ToList();
-            
+
             var products = new List<Product>();
             foreach (var itemRow in itemRows)
             {
@@ -242,7 +343,7 @@ namespace EMPCrawler
 
             return new Product()
             {
-                Link = productlink,
+                Link = "https://www.emp.de" + productlink,
                 Name = productName,
                 Brand = productBrand,
                 Type = productType,
@@ -328,7 +429,7 @@ namespace EMPCrawler
                 {
                     products.AddRange(firstPageProducts);
                 }
-                
+
 
                 for (int i = 1; i < pages; i++)
                 {

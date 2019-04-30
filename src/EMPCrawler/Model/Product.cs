@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
+using System.Web;
 
 namespace EMPCrawler.Model
 {
@@ -69,6 +72,8 @@ namespace EMPCrawler.Model
             var result = false;
             var lastHistoryEntry = ProductHistories.Last();
 
+            var telegramClient = new HttpClient();
+
             if (lastHistoryEntry == null)
             {
                 //No entry found in history
@@ -76,27 +81,42 @@ namespace EMPCrawler.Model
             }
             else if (lastHistoryEntry.Availability != product.Availability)
             {
-                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(Availability) + " changed from " + lastHistoryEntry.Availability + " to " + product.Availability);
+                var message = product.Name + " (" + product.ProductCode + ") - " + nameof(Availability) + " changed from " + lastHistoryEntry.Availability + " to " + product.Availability + " (" + product.Link + ")";
+                Console.WriteLine(message);
+                message = HttpUtility.UrlEncode(message);
+                telegramClient.PostAsync("https://api.telegram.org/" + Program.TelegramKey + "/sendMessage?chat_id=339666943&text=" + message, null).Wait();
                 result = true;
             }
             else if (lastHistoryEntry.DiscountPercentage != product.DiscountPercentage)
             {
-                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(DiscountPercentage) + " changed from " + lastHistoryEntry.DiscountPercentage + " to " + product.DiscountPercentage);
+                var message = product.Name + " (" + product.ProductCode + ") - " + nameof(DiscountPercentage) + " changed from " + lastHistoryEntry.DiscountPercentage + " to " + product.DiscountPercentage + " (" + product.Link + ")";
+                Console.WriteLine(message);
+                message = HttpUtility.UrlEncode(message);
+                telegramClient.PostAsync("https://api.telegram.org/" + Program.TelegramKey + "/sendMessage?chat_id=339666943&text=" + message, null).Wait();
                 result = true;
             }
             else if (lastHistoryEntry.NormalPrice != product.NormalPrice)
             {
-                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(NormalPrice) + " changed from " + lastHistoryEntry.NormalPrice + " to " + product.NormalPrice);
+                var message = product.Name + " (" + product.ProductCode + ") - " + nameof(NormalPrice) + " changed from " + lastHistoryEntry.NormalPrice + " to " + product.NormalPrice + " (" + product.Link + ")";
+                Console.WriteLine(message);
+                message = HttpUtility.UrlEncode(message);
+                telegramClient.PostAsync("https://api.telegram.org/" + Program.TelegramKey + "/sendMessage?chat_id=339666943&text=" + message, null).Wait();
                 result = true;
             }
             else if (lastHistoryEntry.SalePrice != product.SalePrice)
             {
-                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(SalePrice) + " changed from " + lastHistoryEntry.SalePrice + " to " + product.SalePrice);
+                var message = product.Name + " (" + product.ProductCode + ") - " + nameof(SalePrice) + " changed from " + lastHistoryEntry.SalePrice + " to " + product.SalePrice + " (" + product.Link + ")";
+                Console.WriteLine(message);
+                message = HttpUtility.UrlEncode(message);
+                telegramClient.PostAsync("https://api.telegram.org/" + Program.TelegramKey + "/sendMessage?chat_id=339666943&text=" + message, null).Wait();
                 result = true;
             }
             else if (lastHistoryEntry.SaleType != lastHistoryEntry.SaleType)
             {
-                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(SaleType) + " changed from " + lastHistoryEntry.SaleType + " to " + product.SaleType);
+                var message = product.Name + " (" + product.ProductCode + ") - " + nameof(SaleType) + " changed from " + lastHistoryEntry.SaleType + " to " + product.SaleType + " (" + product.Link + ")";
+                Console.WriteLine(message);
+                message = HttpUtility.UrlEncode(message);
+                telegramClient.PostAsync("https://api.telegram.org/" + Program.TelegramKey + "/sendMessage?chat_id=339666943&text=" + message, null).Wait();
                 result = true;
             }
 
