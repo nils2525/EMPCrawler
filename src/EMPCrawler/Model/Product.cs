@@ -66,20 +66,41 @@ namespace EMPCrawler.Model
 
         public bool HistorieChanged(Product product)
         {
+            var result = false;
             var lastHistoryEntry = ProductHistories.Last();
-            if(lastHistoryEntry == null ||
-                lastHistoryEntry.Availability != product.Availability ||
-                lastHistoryEntry.DiscountPercentage != product.DiscountPercentage ||
-                lastHistoryEntry.NormalPrice != product.NormalPrice ||
-                lastHistoryEntry.SalePrice != product.SalePrice ||
-                lastHistoryEntry.SaleType != lastHistoryEntry.SaleType)
+
+            if (lastHistoryEntry == null)
             {
-                return true;
+                //No entry found in history
+                result = true;
             }
-            else
+            else if (lastHistoryEntry.Availability != product.Availability)
             {
-                return false;
+                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(Availability) + " changed from " + lastHistoryEntry.Availability + " to " + product.Availability);
+                result = true;
             }
+            else if (lastHistoryEntry.DiscountPercentage != product.DiscountPercentage)
+            {
+                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(DiscountPercentage) + " changed from " + lastHistoryEntry.DiscountPercentage + " to " + product.DiscountPercentage);
+                result = true;
+            }
+            else if (lastHistoryEntry.NormalPrice != product.NormalPrice)
+            {
+                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(NormalPrice) + " changed from " + lastHistoryEntry.NormalPrice + " to " + product.NormalPrice);
+                result = true;
+            }
+            else if (lastHistoryEntry.SalePrice != product.SalePrice)
+            {
+                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(SalePrice) + " changed from " + lastHistoryEntry.SalePrice + " to " + product.SalePrice);
+                result = true;
+            }
+            else if (lastHistoryEntry.SaleType != lastHistoryEntry.SaleType)
+            {
+                Console.WriteLine(product.Name + " (" + product.ProductCode + ") - " + nameof(SaleType) + " changed from " + lastHistoryEntry.SaleType + " to " + product.SaleType);
+                result = true;
+            }
+
+            return result;
         }
     }
 }

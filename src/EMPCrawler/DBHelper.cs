@@ -22,7 +22,9 @@ namespace EMPCrawler
 
                     //add product to db, if not exist
                     if (dbProduct == null)
-                    {                        
+                    {
+                        Console.WriteLine("Found new product in wishlist");
+
                         product.ProductHistories.Add(new ProductHistory()
                         {
                             Availability = product.Availability,

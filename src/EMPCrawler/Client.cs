@@ -164,6 +164,8 @@ namespace EMPCrawler
         /// <returns></returns>
         public async Task<List<Product>> GetWishListProductsAsync(HtmlDocument wishList = null)
         {
+            Console.WriteLine("Get products from wishlist");
+
             //Only possible with logged in user
             if (!IsLoggedIn)
             {
@@ -173,6 +175,8 @@ namespace EMPCrawler
             //Get Wishlist, if parameter is null
             if (wishList == null)
             {
+                WaitForDelay();
+
                 //Get products from wishlist
                 var wishListResponse = await _client.GetAsync("https://www.emp.de/wishlist");
                 if (wishListResponse.IsSuccessStatusCode)
