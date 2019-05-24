@@ -385,7 +385,7 @@ namespace EMPCrawler
             if (bscSalePriceString != null)
             {
                 saleType = SaleType.BSC;
-                salePrice = Decimal.Parse(Regex.Match(salePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
+                salePrice = Decimal.Parse(Regex.Match(bscSalePriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
             }
 
             return priceNode;
