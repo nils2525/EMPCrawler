@@ -11,10 +11,10 @@ namespace EMPCrawler.Model
 
         public decimal NormalPrice { get; set; }
 
-        public SaleType? SaleType { get; set; }
+        public SaleType? SaleType { get; set; } = Model.SaleType.None;
 
-        public decimal? SalePrice { get; set; }
-        public int? DiscountPercentage { get; set; }
+        public decimal? SalePrice { get; set; } = 0;
+        public int? DiscountPercentage { get; set; } = 0;
 
         private string _availabilityString;
         public string AvailabilityString

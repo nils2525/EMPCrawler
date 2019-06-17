@@ -12,44 +12,50 @@ namespace EMPCrawler
 {
     class Program
     {
-        internal static string TelegramKey { get; private set; }
         static async Task Main(string[] args)
         {
-            TelegramKey = args[2];
-
-            var client = new Client(args[0], args[1]);
-
-            //If no valid cookies saved
-            if (!client.RestoreLoginCookies() || !await client.CurrentCookiesAreValid())
+            if(args == null)
             {
-                //Login
-                var loginResult = await client.Login("wishlist");
+                args = new string[2];
+                args[0] = "";
+                args[1] = "45";
+            }
 
-                //Get wishlist
-                var wishList = await client.GetWishListProductsAsync(loginResult);
+            if (Data.ConfigService.LoadConfig())
+            {
+                var client = new Client(Data.ConfigService.Instance.Mailaddress, Data.ConfigService.Instance.Password);
+                int minDiscount = 0;
+
+                List<Model.Product> products;
+
+                //If no valid cookies saved
+                if (!client.RestoreLoginCookies() || !await client.CurrentCookiesAreValid())
+                {
+                    //Login
+                    await client.Login();
+                }
+
+                if (String.IsNullOrWhiteSpace(args?[0]))
+                {
+                    //Get wishlist
+                    products = await client.GetWishListProductsAsync();
+                }
+                else
+                {
+                    products = await client.GetProductsAsync(args[0]);
+
+                    if (!String.IsNullOrWhiteSpace(args[1]))
+                    {
+                        minDiscount = Int32.Parse(args[1]);
+                    }
+                }
 
                 //Store cookies
                 client.StoreLoginCookies();
 
                 //Update products
-                DBHelper.UpdateProducts(wishList);
+                DBHelper.UpdateProducts(products, minDiscount);
             }
-            else
-            {
-                //Has already valid cookies, get wishlist
-                var wishList = await client.GetWishListProductsAsync();
-
-                //Store updated cookies
-                client.StoreLoginCookies();
-
-                //Update products
-                DBHelper.UpdateProducts(wishList);
-            }
-
-            //IntervalJobService.InitJobService(args[0], args[1]);
-            //IntervalJobService.StartWishlistUpdater(60);
-
-            //new Task(() => { }).Wait(-1);
         }
     }
 }

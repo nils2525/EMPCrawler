@@ -180,7 +180,7 @@ namespace EMPCrawler
 
                     return IsLoggedIn = true;
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     return false;
                 }

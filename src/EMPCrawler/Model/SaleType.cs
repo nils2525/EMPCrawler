@@ -6,6 +6,7 @@ namespace EMPCrawler.Model
 {
     public enum SaleType
     {
+        None,
         Normal,
         BSC
     }

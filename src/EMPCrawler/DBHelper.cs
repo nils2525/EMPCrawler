@@ -12,7 +12,7 @@ namespace EMPCrawler
 {
     public static class DBHelper
     {
-        public static bool UpdateProducts(List<Product> products)
+        public static bool UpdateProducts(List<Product> products, int minDiscount)
         {
             using (var context = new SQLiteContext())
             {                
@@ -24,7 +24,7 @@ namespace EMPCrawler
                         context.Products.Local.Where(p => p.ProductCode == product.ProductCode).FirstOrDefault();
 
                     //add product to db, if not exist
-                    if (dbProduct == null)
+                    if (dbProduct == null && (product.DiscountPercentage ?? 0) >= minDiscount)
                     {
                         Console.WriteLine("Found new product in wishlist");
                         var telegramClient = new HttpClient();
@@ -47,7 +47,7 @@ namespace EMPCrawler
                     else
                     {
                         //product exist, update history when something changed...
-                        if (dbProduct.HistorieChanged(product))
+                        if ((product.DiscountPercentage ?? 0) >= minDiscount && dbProduct.HistorieChanged(product))
                         {
                             dbProduct.ProductHistories.Add(new ProductHistory()
                             {
