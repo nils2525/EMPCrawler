@@ -109,16 +109,11 @@ namespace EMPCrawler
                 return null;
             }
 
-            if (String.IsNullOrWhiteSpace(scope))
-            {
-                scope = "";
-            }
-
             //Delete possible cookies
             _cookies = new CookieContainer();
 
             //Init request to generate needed cookies
-            var initRequest = await _client.GetAsync("https://www.emp.de/" + scope);
+            var initRequest = await _client.GetAsync("https://www.emp.de/" + (scope ?? "login"));
             var rawInit = await initRequest.Content.ReadAsStringAsync();
 
             //Get parameter keys for login (changed every login...)

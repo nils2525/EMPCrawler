@@ -50,7 +50,7 @@ namespace EMPCrawler
                 products = await _empClient.GetWishListProductsAsync();
             }
 
-            DBHelper.UpdateProducts(products);
+            DBHelper.UpdateProducts(products, 0);
         }
     }
 }
