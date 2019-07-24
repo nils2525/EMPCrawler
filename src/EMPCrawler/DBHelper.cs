@@ -14,17 +14,23 @@ namespace EMPCrawler
     {
         public static bool UpdateProducts(List<Product> products, int minDiscount)
         {
+            if (minDiscount > 0)
+            {
+                minDiscount = minDiscount / -1;
+            }
+
             using (var context = new SQLiteContext())
-            {                
+            {
                 //context.Database.EnsureCreated();
 
+                var prod = products.Where(c => c.ProductCode == 227881).FirstOrDefault();
                 foreach (var product in products)
                 {
                     var dbProduct = context.Products.Include(nameof(Product.ProductHistories)).Where(p => p.ProductCode == product.ProductCode).FirstOrDefault() ?? 
                         context.Products.Local.Where(p => p.ProductCode == product.ProductCode).FirstOrDefault();
 
-                    //add product to db, if not exist
-                    if (dbProduct == null && (product.DiscountPercentage ?? 0) >= minDiscount)
+                    //add product to db, if on sale and not exist
+                    if (dbProduct == null && (product.DiscountPercentage ?? 0) <= minDiscount)
                     {
                         Console.WriteLine("Found new product in wishlist");
                         var telegramClient = new HttpClient();
@@ -45,9 +51,9 @@ namespace EMPCrawler
                         var entry = context.Products.Add(product);
                     }
                     else
-                    {
-                        //product exist, update history when something changed...
-                        if ((product.DiscountPercentage ?? 0) >= minDiscount && dbProduct.HistorieChanged(product))
+                    {      
+                        //product exist, update history when something changed... (if -50% discount is bigger than the min discount -20%)
+                        if ((product.DiscountPercentage ?? 0) <= minDiscount && dbProduct.HistorieChanged(product))
                         {
                             dbProduct.ProductHistories.Add(new ProductHistory()
                             {
