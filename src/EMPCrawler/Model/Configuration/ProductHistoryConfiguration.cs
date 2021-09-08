@@ -29,8 +29,6 @@ namespace EMPCrawler.Model.Configuration
 
             builder.Property(p => p.Timestamp)
                 .IsRequired(true);
-
-            builder.Ignore(p => p.AvailabilityString);
         }
     }
 }

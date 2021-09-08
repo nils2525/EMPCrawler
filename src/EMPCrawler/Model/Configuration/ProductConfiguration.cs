@@ -16,26 +16,22 @@ namespace EMPCrawler.Model.Configuration
                 .IsRequired();
 
             builder.Property(p => p.Name)
-                .IsRequired()
+                .IsRequired(false)
                 .HasMaxLength(100);
 
             builder.Property(p => p.Brand)
-                .IsRequired()
+                .IsRequired(false)
                 .HasMaxLength(50);
 
             builder.Property(p => p.Type)
-                .IsRequired()
-                .HasMaxLength(50);
-
-            builder.Property(p => p.Link)
-                .IsRequired()
-                .HasMaxLength(200);
+                .IsRequired(false)
+                .HasMaxLength(50);            
 
             builder.Property(p => p.ImageUrl)
                 .IsRequired(false)
                 .HasMaxLength(500);
 
-            builder.Ignore(p => p.AvailabilityString);
+            builder.Ignore(p => p.Link);
             builder.Ignore(p => p.Availability);
             builder.Ignore(p => p.NormalPrice);
             builder.Ignore(p => p.SalePrice);

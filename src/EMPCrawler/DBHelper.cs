@@ -23,7 +23,6 @@ namespace EMPCrawler
             {
                 //context.Database.EnsureCreated();
 
-                var prod = products.Where(c => c.ProductCode == 227881).FirstOrDefault();
                 foreach (var product in products)
                 {
                     var dbProduct = context.Products.Include(nameof(Product.ProductHistories)).Where(p => p.ProductCode == product.ProductCode).FirstOrDefault() ?? 

@@ -287,7 +287,7 @@ namespace EMPCrawler
             }
 
             //Every item row
-            var itemRows = wishList.DocumentNode.DescendantsAndSelf("tr").Where(c => c.Attributes.Contains("class") && c.Attributes["class"].Value.Contains("item-row js-product-items")).ToList();
+            var itemRows = wishList.DocumentNode.DescendantsAndSelf("div").Where(c => c.Attributes.Contains("class") && c.Attributes["class"].Value.Contains("wishlist-item") && c.Attributes.Contains("data-itemid")).ToList();
 
             var products = new List<Product>();
             foreach (var itemRow in itemRows)
@@ -311,45 +311,36 @@ namespace EMPCrawler
         /// <returns></returns>
         private Product GetProductFromWishList(HtmlNode itemRow)
         {
+            var product = new Product();
+
             var imageUrl = GetImageLink(itemRow);
 
-            var nameNode = itemRow.DescendantsAndSelf("div").Where(c => c.Attributes["class"]?.Value == "product-list-item").FirstOrDefault();
+            product.Name = itemRow.DescendantsAndSelf("div").Where(c => c.Attributes["class"]?.Value == "product-name").FirstOrDefault()?.InnerText.Replace("\n", "");
+            product.ProductCode = itemRow.Attributes["data-itemid"]?.Value;
 
-            var productlink = nameNode.DescendantsAndSelf("a").Where(c => c.Attributes.Contains("href")).FirstOrDefault()?.Attributes["href"].Value;
-            var productName = nameNode.DescendantsAndSelf("a").Where(c => c.Attributes.Contains("href")).FirstOrDefault()?.InnerText.Replace("\n", "");
-            var productBrand = nameNode.Descendants("span").FirstOrDefault().InnerText;
-            var productType = nameNode.Descendants("span").Skip(2).FirstOrDefault().InnerText;
-
-            var productCodeString = nameNode.Descendants("td").Where(c => c.Attributes["class"]?.Value == "dyvalue").FirstOrDefault().InnerText;
-            var productCode = Int32.Parse(productCodeString);
-
-
-            var availabilityString = itemRow.Descendants("ul").Where(c => c.Attributes["class"]?.Value == "product-availability-list").FirstOrDefault()?.Descendants("li")?.Where(c => c.Attributes.Contains("class"))?.FirstOrDefault()?.Attributes["class"]?.Value;
-
-            var priceNode = GetPrices("price", itemRow, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice);
-
-            var discountString = priceNode.Descendants("input").Where(c => c.Attributes["class"]?.Value == "disountPercent")?.FirstOrDefault()?.Attributes["value"]?.Value?.Replace("%", "");
-
-            int? discount = null;
-            if (discountString != null)
+            if (true) // ToDo: If product is available
             {
-                discount = Int32.Parse(discountString);
+                var priceNode = GetPrices("price-wrapper", itemRow, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice);
+                if (priceNode != null)
+                {
+                    product.Availability = ProductAvailability.InStock;
+                    product.NormalPrice = normalPrice;
+                    product.SalePrice = salePrice;
+                    product.SaleType = saleType;
+
+                    var discountString = priceNode.Descendants("input").Where(c => c.Attributes["class"]?.Value == "disountPercent")?.FirstOrDefault()?.Attributes["value"]?.Value?.Replace("%", "");
+                    if (discountString != null)
+                    {
+                        product.DiscountPercentage = Int32.Parse(discountString);
+                    }
+                }
+                else
+                {
+                    product.Availability = ProductAvailability.NotAvailable;
+                }
             }
 
-            return new Product()
-            {
-                Link = "https://www.emp.de" + productlink,
-                Name = productName,
-                Brand = productBrand,
-                Type = productType,
-                ProductCode = productCode,
-                AvailabilityString = availabilityString,
-                NormalPrice = normalPrice,
-                SalePrice = salePrice,
-                DiscountPercentage = discount,
-                ImageUrl = imageUrl,
-                SaleType = saleType
-            };
+            return product;
         }
 
         /// <summary>
@@ -364,8 +355,15 @@ namespace EMPCrawler
         private static HtmlNode GetPrices(string priceNodeName, HtmlNode itemRow, out decimal normalPrice, out SaleType? saleType, out decimal? salePrice)
         {
             var priceNode = itemRow.Descendants("div").Where(c => c.Attributes["class"]?.Value == priceNodeName).FirstOrDefault();
+            if (priceNode == null)
+            {
+                normalPrice = 0;
+                saleType = null;
+                salePrice = null;
+                return null;
+            }
 
-            var normalPriceString = priceNode.Descendants("span").Where(c => c.Attributes.Count == 0).FirstOrDefault().InnerText;
+            var normalPriceString = priceNode.Descendants("span")?.Where(c => c.Attributes.Count == 0)?.FirstOrDefault()?.InnerText;
             normalPrice = Decimal.Parse(Regex.Match(normalPriceString, "[0-9]{1,3},[0-9]{1,2}").Value);
             saleType = null;
             salePrice = null;
@@ -538,11 +536,7 @@ namespace EMPCrawler
 
             var productTitleNode = productNode.Descendants("div").Where(c => c.Attributes["class"]?.Value == "product-tile").FirstOrDefault();
 
-            var productCodeString = productTitleNode.Attributes["data-itemid"]?.Value;
-            var productCode = Int32.Parse(productCodeString);
-
-            var linkNode = productTitleNode.Descendants("a").Where(c => c.Attributes["class"]?.Value == "product-link thumb-link").FirstOrDefault();
-            var link = linkNode.Attributes["href"]?.Value;
+            var productCode = productTitleNode.Attributes["data-itemid"]?.Value;
 
             string imageLink = GetImageLink(productTitleNode);
 
@@ -568,7 +562,6 @@ namespace EMPCrawler
                 Brand = brand,
                 DiscountPercentage = discount,
                 ImageUrl = imageLink,
-                Link = link,
                 Name = name,
                 NormalPrice = normalPrice,
                 ProductCode = productCode,

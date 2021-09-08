@@ -7,7 +7,7 @@ namespace EMPCrawler.Model
 {
     public class ProductHistory
     {
-        public int ProductCode { get; set; }
+        public string ProductCode { get; set; }
 
         public decimal NormalPrice { get; set; }
 
@@ -15,50 +15,7 @@ namespace EMPCrawler.Model
 
         public decimal? SalePrice { get; set; } = 0;
         public int? DiscountPercentage { get; set; } = 0;
-
-        private string _availabilityString;
-        public string AvailabilityString
-        {
-            get
-            {
-                return _availabilityString;
-            }
-            set
-            {
-                if (ProductAvailabilityService.AvailabilityPairs.ContainsKey(value))
-                {
-                    Availability = ProductAvailabilityService.AvailabilityPairs[value];
-                    _availabilityString = value;
-                }
-                else
-                {
-                    _availabilityString = null;
-                    _availability = null;
-                }
-            }
-        }
-
-        private ProductAvailability? _availability;
-        public ProductAvailability? Availability
-        {
-            get
-            {
-                return _availability;
-            }
-            set
-            {
-                _availability = value;
-
-                if (value != null)
-                {
-                    _availabilityString = ProductAvailabilityService.AvailabilityPairs.Where(c => c.Value == value).First().Key;
-                }
-                else
-                {
-                    _availabilityString = null;
-                }
-            }
-        }
+        public ProductAvailability? Availability { get; set; }
 
         public DateTime Timestamp { get; set; }
 
